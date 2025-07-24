@@ -1,14 +1,19 @@
 from flask import Flask, render_template, request
 from werkzeug.utils import secure_filename
 import os
-import openai
 import PyPDF2
 from dotenv import load_dotenv
+from openai import OpenAI
 
-# Load OpenRouter API key
+# Load API key from .env
 load_dotenv()
-openai.api_key = os.getenv("OPENROUTER_API_KEY")
-openai.api_base = "https://openrouter.ai/api/v1"
+api_key = os.getenv("OPENROUTER_API_KEY")
+
+# OpenRouter configuration using OpenAI SDK ≥ 1.0.0
+client = OpenAI(
+    api_key=api_key,
+    base_url="https://openrouter.ai/api/v1"
+)
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploaded_files'
@@ -23,7 +28,9 @@ def extract_text(file_path):
         with open(file_path, 'rb') as f:
             reader = PyPDF2.PdfReader(f)
             for page in reader.pages:
-                text += page.extract_text()
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text
         return text
     return ""
 
@@ -76,14 +83,13 @@ Job Description:
 """
 
             try:
-                response = openai.ChatCompletion.create(
+                response = client.chat.completions.create(
                     model="mistralai/mistral-7b-instruct:free",
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.7,
-                    max_tokens=3500,  # increased token limit
-                    timeout=180
+                    max_tokens=3500,
                 )
-                result = response['choices'][0]['message']['content']
+                result = response.choices[0].message.content
             except Exception as e:
                 result = f"❌ Error: {e}"
 

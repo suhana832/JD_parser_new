@@ -3,3 +3,7 @@ gunicorn
 openai
 python-dotenv
 PyPDF2
+Flask
+python-dotenv
+openai>=1.0.0
+PyPDF2
