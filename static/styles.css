@@ -6,10 +6,6 @@ body {
 }
 
 .container {
-    align-items: center;
-    justify-content: end;
-    display: flex;
-    flex-direction: column;
     max-width: 1000px;
     margin: 40px auto;
     padding: 20px;
