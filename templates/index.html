@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>JD Parser | AI Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>📄 JD Parser AI Assistant</h1>
+        <div class="card">
+            <h2>📁 Upload Job Description (.txt or .pdf)</h2>
+            <form method="post" enctype="multipart/form-data">
+                <input type="file" name="jd_file" accept=".txt,.pdf" required>
+                <button type="submit">🚀 Parse</button>
+            </form>
+        </div>
+
+        {% if result %}
+        <div class="card result-card">
+            <h3>📋 Parsed Output</h3>
+            <textarea readonly>{{ result }}</textarea>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
