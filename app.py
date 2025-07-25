@@ -1,51 +1,41 @@
-from flask import Flask, render_template, request
-from werkzeug.utils import secure_filename
+import streamlit as st
 import os
 import PyPDF2
 from dotenv import load_dotenv
-from openai import OpenAI
+import google.generativeai as genai
 
-# Load API key from .env
+# Load API Key
 load_dotenv()
-api_key = os.getenv("OPENROUTER_API_KEY")
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# OpenRouter configuration using OpenAI SDK ≥ 1.0.0
-client = OpenAI(
-    api_key=api_key,
-    base_url="https://openrouter.ai/api/v1"
-)
-
-app = Flask(__name__)
-UPLOAD_FOLDER = 'uploaded_files'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-def extract_text(file_path):
-    if file_path.endswith('.txt'):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return f.read()
-    elif file_path.endswith('.pdf'):
+# Function to extract text from uploaded file
+def extract_text(uploaded_file):
+    if uploaded_file.name.endswith('.txt'):
+        return uploaded_file.read().decode("utf-8")
+    elif uploaded_file.name.endswith('.pdf'):
+        pdf_reader = PyPDF2.PdfReader(uploaded_file)
         text = ""
-        with open(file_path, 'rb') as f:
-            reader = PyPDF2.PdfReader(f)
-            for page in reader.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text
+        for page in pdf_reader.pages:
+            content = page.extract_text()
+            if content:
+                text += content
         return text
     return ""
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    result = ""
-    if request.method == 'POST':
-        file = request.files['jd_file']
-        if file:
-            filename = secure_filename(file.filename)
-            file_path = os.path.join(UPLOAD_FOLDER, filename)
-            file.save(file_path)
+# Streamlit UI
+st.set_page_config(page_title="JD Parser AI", layout="centered")
+st.title("📄 Job Description (JD) Parser using Gemini AI")
 
-            jd_text = extract_text(file_path)
+uploaded_file = st.file_uploader("Upload a JD file (.txt or .pdf)", type=["txt", "pdf"])
 
+if uploaded_file:
+    jd_text = extract_text(uploaded_file)
+
+    st.markdown("### ✨ Preview Extracted JD Text")
+    st.text_area("Extracted JD", jd_text, height=300)
+
+    if st.button("🔍 Parse with AI"):
+        with st.spinner("Generating AI Output..."):
             prompt = f"""
 You are an expert technical recruiter assistant.
 
@@ -61,7 +51,7 @@ Given the following job description (JD), generate output in **structured markdo
 
 ---
 
-### 2. 🧠 10 (ten) Screening Questions and Answers  
+### 2. 🧠 10 Screening Questions and Answers  
 Divide into categories below. Each question **must have an ideal answer**.
 - **Domain Expertise**
 - **Product/Tech Depth**
@@ -79,21 +69,14 @@ Divide into categories below. Each question **must have an ideal answer**.
 
 Job Description:
 {jd_text}
----
 """
 
             try:
-                response = client.chat.completions.create(
-                    model="mistralai/mistral-7b-instruct:free",
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=0.7,
-                    max_tokens=3500,
-                )
-                result = response.choices[0].message.content
+                model = genai.GenerativeModel("gemini-pro")
+                response = model.generate_content(prompt)
+                st.success("✅ Parsed Successfully!")
+                st.markdown("### 📋 AI Output")
+                st.markdown(response.text)
+
             except Exception as e:
-                result = f"❌ Error: {e}"
-
-    return render_template('index.html', result=result)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+                st.error(f"❌ Error: {e}")
