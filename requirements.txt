@@ -1,9 +1,4 @@
-Flask
-gunicorn
-openai
+streamlit
 python-dotenv
-PyPDF2
-Flask
-python-dotenv
-openai>=1.0.0
+google-generativeai
 PyPDF2

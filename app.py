@@ -4,79 +4,77 @@ import PyPDF2
 from dotenv import load_dotenv
 import google.generativeai as genai
 
-# Load API Key
+# Load .env
 load_dotenv()
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+api_key = os.getenv("GEMINI_API_KEY")
 
-# Function to extract text from uploaded file
-def extract_text(uploaded_file):
-    if uploaded_file.name.endswith('.txt'):
-        return uploaded_file.read().decode("utf-8")
-    elif uploaded_file.name.endswith('.pdf'):
-        pdf_reader = PyPDF2.PdfReader(uploaded_file)
-        text = ""
-        for page in pdf_reader.pages:
-            content = page.extract_text()
-            if content:
-                text += content
-        return text
-    return ""
+# Configure Gemini
+genai.configure(api_key=api_key)
 
-# Streamlit UI
-st.set_page_config(page_title="JD Parser AI", layout="centered")
-st.title("📄 Job Description (JD) Parser using Gemini AI")
+model = genai.GenerativeModel("gemini-1.5-flash")
 
-uploaded_file = st.file_uploader("Upload a JD file (.txt or .pdf)", type=["txt", "pdf"])
+# PDF/TXT Text Extractor
+def extract_text(file):
+    if file.name.endswith(".pdf"):
+        reader = PyPDF2.PdfReader(file)
+        return "\n".join(page.extract_text() for page in reader.pages if page.extract_text())
+    else:
+        return file.read().decode("utf-8")
 
-if uploaded_file:
-    jd_text = extract_text(uploaded_file)
-
-    st.markdown("### ✨ Preview Extracted JD Text")
-    st.text_area("Extracted JD", jd_text, height=300)
-
-    if st.button("🔍 Parse with AI"):
-        with st.spinner("Generating AI Output..."):
-            prompt = f"""
+# Prompt Template
+def build_prompt(jd_text):
+    return f"""
 You are an expert technical recruiter assistant.
 
-Given the following job description (JD), generate output in **structured markdown** format with the following 3 sections:
+Given the following job description (JD), generate output in structured markdown format with the following 3 sections:
 
 ---
 
 ### 1. ✅ Search Criteria
-
-- **Boolean Keyword String** for sourcing candidates  
-- **Mandatory Skills/Experience**  
-- **Preferred Skills/Experience**  
+- Boolean Keyword String  
+- Mandatory Skills/Experience  
+- Preferred Skills/Experience  
 
 ---
 
 ### 2. 🧠 10 Screening Questions and Answers  
-Divide into categories below. Each question **must have an ideal answer**.
-- **Domain Expertise**
-- **Product/Tech Depth**
-- **Cross-functional/Partner Management**
-- **Fitment & Motivation**
+Categorize into:
+- Domain Expertise  
+- Product/Tech Depth  
+- Cross-functional/Partner Management  
+- Fitment & Motivation  
+(Provide ideal answers too)
 
 ---
 
 ### 3. 🗺️ Source Mapping
-- Relevant companies in India (Chennai preferred)  
+- Companies in India (Chennai preferred)  
 - Relevant job titles  
-- LinkedIn search filters (Title, Skills, Location, Experience)
+- LinkedIn Filters (Title, Skills, Location, Experience)
 
 ---
 
-Job Description:
+JD:
 {jd_text}
 """
 
-            try:
-                model = genai.GenerativeModel("gemini-pro")
-                response = model.generate_content(prompt)
-                st.success("✅ Parsed Successfully!")
-                st.markdown("### 📋 AI Output")
-                st.markdown(response.text)
+# UI
+st.set_page_config("JD Parser AI", layout="wide")
+st.title("📋 JD Parser – AI Assistant")
+st.markdown("Upload a `.txt` or `.pdf` Job Description and get structured insights!")
 
-            except Exception as e:
-                st.error(f"❌ Error: {e}")
+uploaded_file = st.file_uploader("Upload Job Description File", type=["txt", "pdf"])
+
+if uploaded_file:
+    with st.spinner("Extracting and analyzing JD..."):
+        jd_text = extract_text(uploaded_file)
+        prompt = build_prompt(jd_text)
+
+        try:
+            response = model.generate_content(prompt)
+            st.success("✅ Parsed Successfully!")
+            st.download_button("📥 Download Output", response.text, file_name="JD_Output.md")
+            st.markdown("### 📄 Parsed JD Output:")
+            st.markdown(response.text)
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
