@@ -1,27 +1,34 @@
 import streamlit as st
 import os
 import PyPDF2
+import docx
 from dotenv import load_dotenv
 import google.generativeai as genai
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from io import BytesIO
 
-# Load .env
+# Load API key from .env
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
-
-# Configure Gemini
 genai.configure(api_key=api_key)
 
+# Use Gemini model
 model = genai.GenerativeModel("gemini-1.5-flash")
 
-# PDF/TXT Text Extractor
+# Extract text from various formats
 def extract_text(file):
     if file.name.endswith(".pdf"):
         reader = PyPDF2.PdfReader(file)
         return "\n".join(page.extract_text() for page in reader.pages if page.extract_text())
-    else:
+    elif file.name.endswith(".txt"):
         return file.read().decode("utf-8")
+    elif file.name.endswith(".docx"):
+        doc = docx.Document(file)
+        return "\n".join([para.text for para in doc.paragraphs])
+    return ""
 
-# Prompt Template
+# Build structured prompt
 def build_prompt(jd_text):
     return f"""
 You are an expert technical recruiter assistant.
@@ -58,23 +65,39 @@ JD:
 {jd_text}
 """
 
-# UI
+# Convert AI response to downloadable PDF
+def generate_pdf(content):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer)
+    styles = getSampleStyleSheet()
+    elements = [Paragraph(line.strip(), styles["Normal"]) for line in content.split("\n") if line.strip()]
+    elements.insert(0, Spacer(1, 12))
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
+# Streamlit UI
 st.set_page_config("JD Parser AI", layout="wide")
 st.title("📋 JD Parser – AI Assistant")
-st.markdown("Upload a `.txt` or `.pdf` Job Description and get structured insights!")
+st.markdown("Upload a `.txt`, `.pdf`, or `.docx` Job Description and get structured AI-based output!")
 
-uploaded_file = st.file_uploader("Upload Job Description File", type=["txt", "pdf"])
+uploaded_file = st.file_uploader("Upload JD File", type=["txt", "pdf", "docx"])
 
 if uploaded_file:
-    with st.spinner("Extracting and analyzing JD..."):
+    with st.spinner("📊 Processing the job description..."):
         jd_text = extract_text(uploaded_file)
         prompt = build_prompt(jd_text)
 
         try:
             response = model.generate_content(prompt)
-            st.success("✅ Parsed Successfully!")
-            st.download_button("📥 Download Output", response.text, file_name="JD_Output.md")
+            output = response.text
+
+            st.success("✅ JD Parsed Successfully!")
             st.markdown("### 📄 Parsed JD Output:")
-            st.markdown(response.text)
+            st.markdown(output)
+
+            pdf_buffer = generate_pdf(output)
+            st.download_button("📥 Download Output as PDF", data=pdf_buffer, file_name="JD_Output.pdf", mime="application/pdf")
+
         except Exception as e:
             st.error(f"❌ Error: {e}")
