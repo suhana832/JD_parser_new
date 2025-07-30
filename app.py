@@ -10,7 +10,7 @@ from io import BytesIO
 
 # Load API key from .env
 load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
+api_key = st.secrets["GEMINI_API_KEY"]
 genai.configure(api_key=api_key)
 
 # Use Gemini model
